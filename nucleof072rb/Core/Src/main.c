@@ -19,6 +19,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -87,7 +89,30 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
+  //set the max size of the bit transmission
+  const uint16_t max_bit_size = 1023;
+  //set the timer period
+  const uint16_t timer_period = 6400;
+
+  //transmit buffer with start bit (0000 0001), bit flag (1000 0000), zero bit (0000 0000).
+    uint8_t tx_buffer[3] = {0x01, 0x80, 0x00};
+
+  //empty buffer to receive output
+  uint8_t rx_buffer[3] = {0};
+
+  uint8_t last_two_bits = 0;
+  uint16_t adc_out_val = 0;
+  uint16_t adc_count_val = 0;
+
+  //set the max and minimum periods
+  uint16_t max_period = timer_period*0.10;
+  uint16_t min_period = timer_period*0.05;
+
+  //Starts the timer
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
   /* USER CODE END 2 */
 
@@ -95,8 +120,27 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
+	  //sets Chip Select (CS) to low because it idles in high
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
 
+	  //send tx_buffer and receive rx_buffer
+	  HAL_SPI_TransmitReceive(&hspi1, tx_buffer, rx_buffer, 3, HAL_MAX_DELAY);
+
+	  //sets Chip Select (CS) to high
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET);
+
+	  //mask all but the last two bits of the second eight bits
+	  last_two_bits = rx_buffer[1] & 0x03;
+	  //moves all last two bits over and adds the third eight bits to it
+	  adc_out_val = (last_two_bits << 8 | rx_buffer[2]);
+
+	  //ADC value moved into 5-10% range of clock period
+	  adc_count_val = (min_period + (max_period - min_period)*adc_out_val)/max_bit_size;
+
+	  __HAL_TIM_SET_COMPARE(htim1, TIM_CHANNEL_1, adc_count_val);
+
+    /* USER CODE END WHILE */
+	  HAL_Delay(10);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
