@@ -143,7 +143,7 @@ int main(void)
 	  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, adc_count_val);
 
     /* USER CODE END WHILE */
-	  HAL_Delay(10);
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
